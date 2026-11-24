@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Silly Unit Conversion Quiz</title>
+<style>
+  :root { --bg:#fff8ec; --card:#fff; --ink:#1f2937; --muted:#6b7280; --accent:#ea580c; --ok:#16a34a; --bad:#dc2626; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+  .wrap { max-width:640px; margin:0 auto; padding:20px 16px 48px; }
+  h1 { font-size:1.5rem; margin:8px 0 4px; }
+  .sub { color:var(--muted); margin:0 0 20px; }
+  .card { background:var(--card); border-radius:14px; padding:20px; box-shadow:0 2px 10px rgba(0,0,0,.06); }
+  .bar { height:8px; background:#e5e7eb; border-radius:99px; overflow:hidden; margin-bottom:16px; }
+  .bar > div { height:100%; background:var(--accent); width:0; transition:width .3s; }
+  .meta { color:var(--muted); font-size:.9rem; margin-bottom:8px; }
+  .q { font-size:1.2rem; font-weight:600; margin:0 0 16px; }
+  .opt { display:block; width:100%; text-align:left; padding:14px; margin:8px 0; font-size:1rem; border:2px solid #e5e7eb; background:#fff; border-radius:10px; cursor:pointer; color:var(--ink); }
+  .opt:hover:not(:disabled) { border-color:var(--accent); }
+  .opt.correct { border-color:var(--ok); background:#f0fdf4; }
+  .opt.wrong { border-color:var(--bad); background:#fef2f2; }
+  .opt:disabled { cursor:default; }
+  .fb { min-height:24px; margin:10px 0; font-weight:600; }
+  .fb.ok { color:var(--ok); } .fb.bad { color:var(--bad); }
+  button.main { background:var(--accent); color:#fff; border:0; border-radius:10px; padding:12px 22px; font-size:1rem; cursor:pointer; }
+  button.main:disabled { opacity:.4; cursor:default; }
+  .score { font-size:2.4rem; font-weight:700; margin:8px 0; }
+  .review { text-align:left; margin-top:16px; }
+  .review div { padding:10px 0; border-top:1px solid #e5e7eb; font-size:.95rem; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Silly Unit Conversion Quiz 🐘🍌</h1>
+  <p class="sub">5 questions with very serious, very silly units.</p>
+
+  <div id="quiz" class="card">
+    <div class="bar"><div id="progress"></div></div>
+    <div class="meta" id="meta"></div>
+    <p class="q" id="question"></p>
+    <div id="options"></div>
+    <div class="fb" id="feedback"></div>
+    <button class="main" id="next" disabled>Next</button>
+  </div>
+
+  <div id="result" class="card hidden">
+    <div class="meta">Your result</div>
+    <div class="score" id="score"></div>
+    <p id="msg"></p>
+    <div class="review" id="review"></div>
+    <p><button class="main" id="restart">Try again</button></p>
+  </div>
+</div>
+
+<script>
+const QUESTIONS = [
+  { q:"One elephant weighs 5,000 kg. How many kilograms are 5 milli-elephants?",
+    a:["2.5 kg","25 kg","250 kg","25,000 kg"], c:1,
+    e:"Milli means 1/1000. 5 milli-elephants = 0.005 elephants, and 0.005 × 5,000 kg = 25 kg." },
+  { q:"A banana is 20 cm long. How long is 1 kilo-banana in meters?",
+    a:["20 m","200 m","2,000 m","20,000 m"], c:1,
+    e:"Kilo means 1000. 1,000 × 20 cm = 20,000 cm, and 100 cm = 1 m, so that is 200 m." },
+  { q:"A giraffe is 5 meters tall. How many centimeters tall are 3 giraffes stacked on top of each other?",
+    a:["150 cm","1,500 cm","15,000 cm","15 cm"], c:1,
+    e:"3 × 5 m = 15 m, and 15 m × 100 = 1,500 cm." },
+  { q:"A snail crawls at 1 millimeter per second. How far does it go in 1 hour, in meters?",
+    a:["0.36 m","3.6 m","36 m","360 m"], c:1,
+    e:"1 hour = 3,600 seconds, so 3,600 mm. Divide by 1,000 to get 3.6 m." },
+  { q:"One bucket holds 10 liters. How many milliliters are 3 milli-buckets?",
+    a:["3 mL","30 mL","300 mL","3,000 mL"], c:1,
+    e:"3 milli-buckets = 0.003 buckets = 0.03 L (0.003 × 10). Then 0.03 L × 1,000 = 30 mL." }
+];
+
+function shuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+
+let order, idx, score, answers;
+const $ = id => document.getElementById(id);
+
+function start(){
+  order = shuffle(QUESTIONS).map(q => {
+    const opts = q.a.map((text,i)=>({text, correct:i===q.c}));
+    return { q:q.q, e:q.e, opts:shuffle(opts) };
+  });
+  idx = 0; score = 0; answers = [];
+  $("quiz").classList.remove("hidden");
+  $("result").classList.add("hidden");
+  show();
+}
+
+function show(){
+  const item = order[idx];
+  $("meta").textContent = `Question ${idx+1} of ${order.length}`;
+  $("progress").style.width = (idx/order.length*100)+"%";
+  $("question").textContent = item.q;
+  $("feedback").textContent = ""; $("feedback").className = "fb";
+  $("next").disabled = true;
+  $("next").textContent = idx === order.length-1 ? "See results" : "Next";
+  const box = $("options"); box.innerHTML = "";
+  item.opts.forEach((o,i)=>{
+    const b = document.createElement("button");
+    b.className = "opt"; b.textContent = o.text;
+    b.onclick = () => choose(i);
+    box.appendChild(b);
+  });
+}
+
+function choose(i){
+  const item = order[idx];
+  const btns = [...document.querySelectorAll(".opt")];
+  btns.forEach((b,k)=>{
+    b.disabled = true;
+    if(item.opts[k].correct) b.classList.add("correct");
+  });
+  const right = item.opts[i].correct;
+  if(right) score++; else btns[i].classList.add("wrong");
+  answers.push({ q:item.q, right, picked:item.opts[i].text, correct:item.opts.find(o=>o.correct).text, e:item.e });
+  $("feedback").textContent = (right ? "Correct! " : "Not quite. ") + item.e;
+  $("feedback").className = "fb " + (right ? "ok" : "bad");
+  $("next").disabled = false;
+}
+
+$("next").onclick = () => { idx++; if(idx < order.length) show(); else finish(); };
+
+function finish(){
+  $("quiz").classList.add("hidden");
+  $("result").classList.remove("hidden");
+  const pct = Math.round(score/order.length*100);
+  $("score").textContent = `${score} / ${order.length} (${pct}%)`;
+  $("msg").textContent = pct===100 ? "Perfect! You are a certified Master of Milli-Elephants." : pct>=60 ? "Nice! Check the ones you missed." : "Keep practicing. Check the explanations below.";
+  const r = $("review"); r.innerHTML = "";
+  answers.forEach((a,i)=>{
+    const d = document.createElement("div");
+    d.textContent = `${a.right?"✅":"❌"} ${i+1}. ${a.q} ` + (a.right ? `(${a.correct})` : `You: ${a.picked}. Correct: ${a.correct}. ${a.e}`);
+    r.appendChild(d);
+  });
+  window.scrollTo(0,0);
+}
+
+$("restart").onclick = start;
+start();
+</script>
+</body>
+</html>
